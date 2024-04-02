@@ -2,7 +2,7 @@ use truck_modeling::*;
 use truck_polymesh::*; 
 use truck_meshalgo::tessellation::MeshableShape;
 use truck_meshalgo::tessellation::MeshedShape;
-use cgmath::{Point3, Vector3};
+use cgmath::{Point3 as CGPoint3, Vector3};
 use std::os::raw::c_void;
 
 #[no_mangle]
@@ -10,10 +10,98 @@ pub extern "C" fn my_add(x: i32, y: i32) -> i32 {
     x + y
 }
 
+#[repr(C)] // C言語のメモリレイアウト互換性を保証
+pub struct Point3 {
+    pub x: f64, // x座標
+    pub y: f64, // y座標
+    pub z: f64, // z座標
+}
+
+impl Point3 {
+    // Rust側で使うための新しい`Point3`インスタンスを作成するコンストラクタ
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
+        Point3 { x, y, z }
+    }
+}
+
+// `extern "C"`でC言語のインターフェースを提供
+// この関数は、Point3のインスタンスを作成し、そのポインタをisizeとして返します。
+#[no_mangle] // シンボル名のマングリングを防止
+pub extern "C" fn construct_point3(x: f64, y: f64, z: f64) -> isize {
+    let p3 = Point3::new(x, y, z);
+    // ヒープ上に`Point3`インスタンスを生成し、そのポインタをisizeにキャストして返す
+    Box::into_raw(Box::new(p3)) as isize
+}
+
+// この関数は、isizeとして渡されたポインタを`Point3`のポインタに戻し、
+// 対象のメモリを解放します。
+#[no_mangle]
+pub extern "C" fn point3_free(pptr: isize) {
+    if pptr != 0 {
+        unsafe { // unsafeブロックを追加
+            let _ = Box::from_raw(pptr as *mut Point3); // 自動的にドロップされる
+        }
+    }
+}
+
+// x座標の値を取得する関数
+#[no_mangle]
+pub extern "C" fn point3_get_x(pptr: isize) -> f64 {
+    if pptr != 0 {
+        unsafe { // unsafeブロックを追加
+            let pt = &*(pptr as *const Point3);
+            pt.x as f64
+        }
+    } else {
+        0.0 // ポインタがnull（0）の場合、デフォルトとして0.0を返す
+    }
+}
+
+// y座標の値を取得する関数
+#[no_mangle]
+pub extern "C" fn point3_get_y(pptr: isize) -> f64 {
+    if pptr != 0 {
+        unsafe { // unsafeブロックを追加
+            let pt = &*(pptr as *const Point3);
+            pt.y as f64
+        }
+    } else {
+        0.0
+    }
+}
+
+// z座標の値を取得する関数
+#[no_mangle]
+pub extern "C" fn point3_get_z(pptr: isize) -> f64 {
+    if pptr != 0 {
+        unsafe { // unsafeブロックを追加
+            let pt = &*(pptr as *const Point3);
+            pt.z as f64
+        }
+    } else {
+        0.0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn free_ptx(pptr: isize) {
+    let _ = Box::from_raw(pptr as *mut f64); // 自動的にドロップされる
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn free_pty(pptr: isize) {
+    let _ = Box::from_raw(pptr as *mut f64); // 自動的にドロップされる
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn free_ptz(pptr: isize) {
+    let _ = Box::from_raw(pptr as *mut f64); // 自動的にドロップされる
+}
+
 // キューブを作成し、そのポインタをisizeとして返す
 #[no_mangle]
 pub extern "C" fn create_cube(size: f64) -> isize {
-    let vertex = builder::vertex(Point3::new(0.0, 0.0, 0.0));
+    let vertex = builder::vertex(CGPoint3::new(0.0, 0.0, 0.0));
     let edge = builder::tsweep(&vertex, size * Vector3::unit_z());
     let face = builder::tsweep(&edge, size * Vector3::unit_x());
     let solid = builder::tsweep(&face, size * Vector3::unit_y());
